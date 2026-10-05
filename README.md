@@ -37,10 +37,10 @@ The app uses SQLite to keep setup small. Run one app container at a time. The co
 
 ## Telemetry
 
-The app emits OpenTelemetry traces, metrics, and logs, all exported to the console for now. Inspect them with:
+The app emits OpenTelemetry traces, metrics, and logs. `docker compose up` also starts an OpenTelemetry Collector, Prometheus, Loki, Tempo, and Grafana (config in `observability/`). The app ships all three signals to the Collector over OTLP, which fans them out: metrics to Prometheus, logs to Loki, traces to Tempo.
 
-```bash
-docker compose logs app
-```
+Every request gets an HTTP span and a `http_server_duration_milliseconds` metric tagged with the route (`http_target`) and status code (`http_status_code`). Order lookups (`GET /api/orders/{id}`) additionally get a dedicated `order_lookup` span, an `order_lookups_total` counter (tagged by `found`), and an info-level log line, all correlated by trace ID.
 
-Every request gets an HTTP span and a `http.server.duration` metric tagged with the route (`http.route`) and status code (`http.status_code`). Order lookups (`GET /api/orders/{id}`) additionally get a dedicated `order_lookup` span, an `order_lookups_total` counter (tagged by `found`), and an info-level log line, all correlated by trace ID.
+Open <http://127.0.0.1:3000> for Grafana (anonymous viewer access, no login needed) and look at the "Order Tracker - Requests" dashboard for request counts and errors. Use Grafana's Explore view with the Loki or Tempo datasource to dig into individual logs or traces. Prometheus itself is at <http://127.0.0.1:9090> if you want to query metrics directly.
+
+`docker compose logs app` still prints plain-text request logs for quick inspection without opening Grafana.
