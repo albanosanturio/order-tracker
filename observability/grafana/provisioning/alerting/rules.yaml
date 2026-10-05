@@ -1,0 +1,77 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: order-tracker-errors
+    folder: Order Tracker
+    interval: 1m
+    rules:
+      - uid: order-tracker-5xx
+        title: "5xx errors on order-tracker"
+        condition: C
+        for: 0s
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by (http_target) (increase(http_server_duration_milliseconds_count{http_status_code=~"5.."}[5m]))
+              instant: true
+              range: false
+              legendFormat: "{{http_target}}"
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: reduce
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: ["C"]
+                  reducer:
+                    type: last
+                    params: []
+                  type: query
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        annotations:
+          summary: "{{ $labels.http_target }} returned 5xx errors"
+          description: >-
+            {{ $values.B.Value }} request(s) to {{ $labels.http_target }} returned a 5xx status
+            in the last 5 minutes. Dashboard: http://localhost:3000/d/order-tracker-requests/order-tracker-requests?viewPanel=6
+          __dashboardUid__: order-tracker-requests
+          __panelId__: "6"
+        labels:
+          severity: critical
+          service: order-tracker
+        isPaused: false
