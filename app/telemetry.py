@@ -57,6 +57,15 @@ def setup_telemetry() -> None:
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     LoggingInstrumentor().instrument(set_logging_format=True)
 
+    # uvicorn.error (where unhandled-exception tracebacks are logged) has
+    # propagate=False by default, so it never reaches the root logger's
+    # handlers. Attach the OTel handler directly so those tracebacks still
+    # ship to Loki, without double-printing them to the console.
+    otel_handler = next(
+        h for h in logging.getLogger().handlers if type(h).__module__.startswith("opentelemetry")
+    )
+    logging.getLogger("uvicorn.error").addHandler(otel_handler)
+
 
 tracer = trace.get_tracer(SERVICE_NAME)
 meter = metrics.get_meter(SERVICE_NAME)

@@ -71,12 +71,30 @@ services:
       - loki
       - tempo
 
+  incident-response:
+    build: ./incident-response
+    ports:
+      - "127.0.0.1:${INCIDENT_RESPONSE_PORT:-8001}:8001"
+    environment:
+      LOKI_URL: http://loki:3100
+      TEMPO_URL: http://tempo:3200
+      REPO_DIR: /workspace
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - incidents:/data/incidents
+      - .:/workspace
+    restart: unless-stopped
+    depends_on:
+      - loki
+      - tempo
+
 volumes:
   orders:
   prometheus-data:
   loki-data:
   tempo-data:
   grafana-data:
+  incidents:
 
 networks:
   default:
