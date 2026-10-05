@@ -7,7 +7,10 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel, Field
+
+from app.telemetry import logger, order_lookup_counter, setup_telemetry, tracer
 
 
 DB_PATH = Path(os.getenv("ORDER_DB_PATH", "data/orders.db"))
@@ -76,7 +79,10 @@ async def lifespan(_app: FastAPI):
     yield
 
 
+setup_telemetry()
+
 app = FastAPI(title="Order Tracker", lifespan=lifespan)
+FastAPIInstrumentor.instrument_app(app)
 
 
 @app.get("/")
@@ -100,9 +106,17 @@ def list_orders():
 
 @app.get("/api/orders/{order_id}")
 def get_order(order_id: str):
-    with connect() as db:
-        row = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
-    if row is None:
+    with tracer.start_as_current_span("order_lookup") as span:
+        span.set_attribute("order.id", order_id)
+        with connect() as db:
+            row = db.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+        found = row is not None
+        span.set_attribute("order.found", found)
+        order_lookup_counter.add(1, {"found": str(found).lower()})
+        logger.info(
+            "Order lookup %s", "hit" if found else "missed", extra={"order_id": order_id}
+        )
+    if not found:
         raise HTTPException(404, "Order not found")
     return order_detail(row)
 

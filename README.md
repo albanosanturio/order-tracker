@@ -34,3 +34,13 @@ Run tests with `uv run --frozen pytest -q`. Stop the app with `docker compose do
 | PATCH | `/api/orders/{id}` | Change an order status |
 
 The app uses SQLite to keep setup small. Run one app container at a time. The course exercise is about detecting and handling an incident, not scaling the database.
+
+## Telemetry
+
+The app emits OpenTelemetry traces, metrics, and logs, all exported to the console for now. Inspect them with:
+
+```bash
+docker compose logs app
+```
+
+Every request gets an HTTP span and a `http.server.duration` metric tagged with the route (`http.route`) and status code (`http.status_code`). Order lookups (`GET /api/orders/{id}`) additionally get a dedicated `order_lookup` span, an `order_lookups_total` counter (tagged by `found`), and an info-level log line, all correlated by trace ID.
